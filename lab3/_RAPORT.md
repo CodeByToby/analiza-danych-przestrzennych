@@ -3,6 +3,8 @@
 > - Autor: Tobiasz Sleziona
 > - Nr dziennika: 103868
 
+# GeoPandas
+
 ## Narzędzia
 Narzędzia użyte w tym laboratorium:
 - **Jupyter** -- menadżer notatników Jupyter
@@ -12,7 +14,7 @@ Narzędzia użyte w tym laboratorium:
 W tym laboratorium użyto danych sensorowych, dzielnic oraz szkół Opola do wyliczenia wyników na temat zanieczyszczenia
 powietrza w poszczególnych dzielnicach oraz w pobliżu szkół.
 
-Oto jak to osiągnięto krok po kroku (szczegóły oraz kod zawarte są w `lab_geopandas.ipynb`):
+Oto jak to osiągnięto krok po kroku (szczegóły oraz kod zawarte są w `lab_geo/lab_geopandas.ipynb`):
 
 ## Dane sensorów
 
@@ -48,7 +50,7 @@ sensors = gpd.GeoDataFrame(
 4. Zamieniono ukł. współrz. z EPSG:4326 (dane stopniowe) na EPSG:2180 -- ukł. współrz. specjalny dla danych Polskich: 
 `sensors_m = sensors.to_crs("EPSG:2180")`
 
-![img.png](wyniki/imgs/img.png)
+![img.png](lab_geo/wyniki/imgs/img.png)
 
 ## Dzielnice Opola
 
@@ -62,7 +64,7 @@ districts = districts.to_crs("EPSG:2180")           # mandatory!
 districts["area_km2"] = districts.area / 1e6        # m² -> km²
 ```
 
-![img_1.png](wyniki/imgs/img_1.png)
+![img_1.png](lab_geo/wyniki/imgs/img_1.png)
 
 4. Złączono dane dzielnic z danymi sensorowymi: Każdemu sensorowi przypisana została dzielnica, w której się znajduje.
 
@@ -85,7 +87,7 @@ stats = (joined.groupby("name")                  # name = nazwa dzielnicy
 summary = districts.merge(stats, on="name", how="left")
 ```
 
-![img_2.png](wyniki/imgs/img_2.png)
+![img_2.png](lab_geo/wyniki/imgs/img_2.png)
 
 (Na diagramie widoczne są dystrykty pokolorowane na podstawie ich średniej wartości P25:
 Im ciemniejsze, tym P25 jest większe)
@@ -93,7 +95,7 @@ Im ciemniejsze, tym P25 jest większe)
 ## Szkoły
 
 1. Wczytano dane z pliku: `opole_schools.geojson`.
-2. Wyliczono 500-metrowe bufory wokół szkół: okrągłe pola wokół ich lokalizacji.
+2. Wyliczono 500-metrowe okrągłe bufory wokół lokalizacji szkół.
 
 ```python
 buffers["geometry"] = schools.buffer(500)
@@ -104,7 +106,7 @@ buffers["geometry"] = schools.buffer(500)
 ```python
 near_schools = gpd.sjoin(sensors_m, buffers[["name", "geometry"]], predicate="within")
 ```
-![img_3.png](wyniki/imgs/img_3.png)
+![img_3.png](lab_geo/wyniki/imgs/img_3.png)
 
 ## Wyniki
 
@@ -123,6 +125,85 @@ summary.to_crs("EPSG:4326").to_file(out / "pm25_districts.geojson", driver="GeoJ
 
 2. W celu sprawdzenia poprawności daych, plik GeoPackage otworzono w aplikacji QGIS:
 
-![img_5.png](wyniki/imgs/img_5.png)
+![img_5.png](lab_geo/wyniki/imgs/img_5.png)
 
-![img_4.png](wyniki/imgs/img_4.png)
+![img_4.png](lab_geo/wyniki/imgs/img_4.png)
+
+# Rasterio
+
+## Narzędzia
+Narzędzia użyte w tym laboratorium:
+- **Rasterio** -- biblioteka python do danych przestrzennych rasterowych
+
+## Preprocessing danych pasmowych
+
+1. Wczytano dane z trzech źródeł: Sentinel 2, Syntetyczne lub własne GeoTIFF-y.
+2. Odczytano pasma i statystyki wybranego źródła:
+
+```python
+with rasterio.open("S2_L2A_2026-10-06_B04.tiff") as src:
+    red = src.read(1, masked=True).astype("float32")
+
+with rasterio.open("S2_L2A_2026-10-06_B08.tiff") as src:
+    nir = src.read(1, masked=True).astype("float32")
+```
+
+![img.png](lab_geo/wyniki/imgs/img_9.png)
+
+3. Wyznaczono wspólną siatkę (w ukł. współrz. EPSG:2180) dla obu pasm aby możliwa była algebra rastrowa między
+tymi pasmami (piksel na piksel):
+
+```python
+dst_crs = "EPSG:2180"
+dst_transform, width, height = calculate_default_transform(
+    red_src.crs, dst_crs, red_src.width, red_src.height, *red_src.bounds,
+    resolution=10)  
+```
+
+4. Oba pasma przeprojektowano na tą współną siatkę:
+
+```python
+def warp(src):                       # put any band onto the target grid
+    out = np.full((height, width), np.nan, dtype="float32")
+    
+    reproject(source=rasterio.band(src, 1), destination=out,
+              dst_transform=dst_transform, dst_crs=dst_crs,
+              dst_nodata=np.nan, resampling=Resampling.bilinear)
+    return np.ma.masked_invalid(out)
+
+red, nir = warp(red_src), warp(nir_src)
+```
+
+## Analiza danych i statystyki
+
+1. Obliczono NDVI za pomocą prostej algebry rastrowej.
+
+> $NDVI = \frac {NIR - RED} {NIR + RED} = \frac {B08 - B04} {B08 + B04} $
+
+```python
+with np.errstate(divide="ignore", invalid="ignore"):    # 0 / 0 where both bands are 0
+    ndvi = (nir - red) / (nir + red)
+ndvi = np.ma.masked_invalid(ndvi)        
+```
+
+![img_1.png](lab_geo/wyniki/imgs/img_6.png)
+
+2. Obliczono statystyki strefowe na podstawie danych dzielnic z pliku `opole_districts.geojson`.
+
+```python
+with rasterio.open("ndvi.tif") as src:
+    zones = gpd.read_file("opole/opole_districts.geojson").to_crs(src.crs)   # same CRS as the raster!
+    pixel_area = abs(src.transform.a * src.transform.e)
+    for i, zone in zones.iterrows():
+        clipped, _ = rasterio.mask.mask(src, [zone.geometry], crop=True, nodata=np.nan)
+        values = clipped[np.isfinite(clipped)]
+        zones.loc[i, "coverage"] = values.size * pixel_area / zone.geometry.area   # part of the zone inside the scene
+        zones.loc[i, "ndvi_mean"] = values.mean()
+```
+
+![img_3.png](lab_geo/wyniki/imgs/img_8.png)
+
+3. Wygenerowane dane rastrowe NDVI zapisano do pliku.
+
+> Finalne NDVI:
+> ![img_10.png](lab_geo/wyniki/imgs/img_10.png)
