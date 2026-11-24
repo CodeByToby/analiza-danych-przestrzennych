@@ -203,9 +203,9 @@ with rasterio.open("ndvi.tif") as src:
         zones.loc[i, "ndvi_mean"] = values.mean()
 ```
 
-![img_3.png](lab_geo/wyniki/imgs/img_8.png)
+![img_3.png](imgs/img_8.png)
 
 3. Wygenerowane dane rastrowe NDVI zapisano do pliku.
 
 > Finalne NDVI:
-> ![img_10.png](lab_geo/wyniki/imgs/img_10.png)
+> ![img_10.png](imgs/img_10.png)
