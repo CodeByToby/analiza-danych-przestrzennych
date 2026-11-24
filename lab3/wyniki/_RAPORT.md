@@ -5,16 +5,16 @@
 
 # GeoPandas
 
+W tym laboratorium użyto danych sensorowych, dzielnic oraz szkół Opola do wyliczenia wyników na temat zanieczyszczenia
+powietrza w poszczególnych dzielnicach oraz w pobliżu szkół.
+
+Oto jak to osiągnięto krok po kroku (szczegóły oraz kod zawarte są w `../lab_geo/lab_geopandas.ipynb`):
+
 ## Narzędzia
 Narzędzia użyte w tym laboratorium:
 - **Jupyter** -- menadżer notatników Jupyter
 - **GeoPandas** -- biblioteka python do danych przestrzennych wektorowych
 - **QGIS**, **Google Maps**
-
-W tym laboratorium użyto danych sensorowych, dzielnic oraz szkół Opola do wyliczenia wyników na temat zanieczyszczenia
-powietrza w poszczególnych dzielnicach oraz w pobliżu szkół.
-
-Oto jak to osiągnięto krok po kroku (szczegóły oraz kod zawarte są w `../lab_geo/lab_geopandas.ipynb`):
 
 ## Dane sensorów
 
@@ -56,7 +56,7 @@ sensors = gpd.GeoDataFrame(
 
 1. wczytano dane z pliku `opole_districts.geojson`.
 2. Zamieniono ukł współrz. na ten sam co ukł. sensorów: **EPSG:2180** w celu obliczenia powierzchni
-> bez zamiany na EPSG:2180 dane są w układzie metrowym tylko stopniowym, więc wyliczona powierzchnia nie będzie poprawna.
+> bez zamiany na EPSG:2180 dane nie są w układzie metrowym tylko stopniowym, więc wyliczona powierzchnia nie będzie poprawna.
 3. obliczono powierzchnie poszczególnych dzielnic w $km^2$ na podstawie danych w $m^2$.
 
 ```python
@@ -130,6 +130,8 @@ summary.to_crs("EPSG:4326").to_file(out / "pm25_districts.geojson", driver="GeoJ
 ![img_4.png](imgs/img_4.png)
 
 # Rasterio
+
+(szczegóły oraz kod zawarte są w `geopandas_code.py` oraz `rasterio_code.py`):
 
 ## Narzędzia
 Narzędzia użyte w tym laboratorium:
