@@ -2,7 +2,7 @@ import rasterio
 
 # TRANSFORMACJE AFINICZNE ------------------
 
-with rasterio.open("Sentinel-2_L2A_B04.tiff") as src:   # always via "with" — the file gets closed
+with rasterio.open("dane/Sentinel-2_L2A_B04.tiff") as src:   # always via "with" — the file gets closed
     print(src.profile)      # everything needed to write a similar file
     print(src.crs)          # coordinate reference system
     print(src.bounds)       # extent in CRS units
@@ -32,8 +32,8 @@ with rasterio.open("Sentinel-2_L2A_B04.tiff") as src:   # always via "with" — 
 import numpy as np
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
-red_src = rasterio.open("Sentinel-2_L2A_B04.tiff")
-nir_src = rasterio.open("Sentinel-2_L2A_B08.tiff")
+red_src = rasterio.open("dane/Sentinel-2_L2A_B04.tiff")
+nir_src = rasterio.open("dane/Sentinel-2_L2A_B08.tiff")
 
 # checks if both are the same grid
 same_grid = (red_src.crs == nir_src.crs
@@ -75,7 +75,7 @@ print(f"red.mask.sum = {ndvi.mask.sum()}")                         # how many "n
 import geopandas as gpd
 import rasterio.mask
 
-with rasterio.open("Sentinel-2_L2A_NDVI.tiff") as src:
+with rasterio.open("dane/Sentinel-2_L2A_NDVI.tiff") as src:
     zones = gpd.read_file("lab_geo/dane/opole_districts.geojson").to_crs(src.crs)   # same CRS as the raster!
     pixel_area = abs(src.transform.a * src.transform.e)
     for i, zone in zones.iterrows():
@@ -86,7 +86,7 @@ with rasterio.open("Sentinel-2_L2A_NDVI.tiff") as src:
 
 # ZAPIS DO PLIKU ----------------------
 
-with rasterio.open("Sentinel-2_L2A_B04.tiff") as src:
+with rasterio.open("dane/Sentinel-2_L2A_B04.tiff") as src:
     profile = src.profile                     # start from the input's profile…
 
 profile.update(                               # …and describe the grid we computed NDVI on
@@ -94,6 +94,6 @@ profile.update(                               # …and describe the grid we comp
     dtype="float32", count=1, nodata=np.nan, compress="deflate",
 )
 
-with rasterio.open("ndvi.tif", "w", **profile) as dst:
+with rasterio.open("wyniki/ndvi.tif", "w", **profile) as dst:
     dst.write(ndvi.filled(np.nan).astype("float32"), 1)
     dst.set_band_description(1, "NDVI")
